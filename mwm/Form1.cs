@@ -7,7 +7,7 @@ namespace mwm
     public partial class Form1 : Form
     {
         // Define a single variable for the height of the top bar
-        private readonly int TopBarHeight = 40;
+        private readonly int TopBarHeight = 30;
 
         // Constants for AppBar messages
         private const int ABM_NEW = 0x00000000;
