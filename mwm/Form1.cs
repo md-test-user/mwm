@@ -15,7 +15,8 @@ namespace mwm
         private const int ABM_SETPOS = 0x00000003;
         private const int ABE_TOP = 1;
 
-        private FileSystemWatcher watcher;  // FileSystemWatcher to monitor changes
+        // Array of blacklisted extensions
+        private readonly string[] blacklistedExtensions = { ".lnk", ".exe", ".url", ".bat", ".cmd" };
 
         [StructLayout(LayoutKind.Sequential)]
         public struct APPBARDATA
@@ -115,8 +116,6 @@ namespace mwm
         }
 
         // Method to display the contents of the folder
-        private readonly string[] blacklistedExtensions = { ".lnk", ".exe", ".url", ".bat", ".cmd" };
-
         private void DisplayFolderContent()
         {
             this.Controls.Clear();
@@ -130,29 +129,213 @@ namespace mwm
                     string fileName = Path.GetFileName(item);
                     string extension = Path.GetExtension(fileName).ToLower();
 
-                    // If the extension is in the blacklistedExtensions array, remove it from the displayed text
+                    // Remove the extension if it's in the blacklist
                     if (Array.Exists(blacklistedExtensions, ext => ext == extension))
                     {
-                        fileName = Path.GetFileNameWithoutExtension(item); // Remove the extension
+                        fileName = Path.GetFileNameWithoutExtension(item);
                     }
 
-                    var button = new Button
+                    // Remove the "-menuitem" suffix from the folder name
+                    if (Directory.Exists(item) && fileName.EndsWith("-menuitem"))
                     {
-                        Text = fileName,
-                        Tag = item,
-                        Left = xOffset,
-                        Top = 5,
-                        Width = 150,
-                        Height = TopBarHeight - 10
-                    };
-                    button.Click += Item_Click;
-                    this.Controls.Add(button);
+                        fileName = fileName.Replace("-menuitem", "");  // Remove the "-menuitem" suffix
 
-                    xOffset += button.Width + 5;
+                        var button = new Button
+                        {
+                            Text = fileName,
+                            Tag = item,
+                            Left = xOffset,
+                            Top = 5,
+                            Width = 150,
+                            Height = TopBarHeight - 10
+                        };
+
+                        // Add a dropdown for the folder
+                        button.MouseDown += (s, e) =>
+                        {
+                            if (e.Button == MouseButtons.Left)
+                            {
+                                ShowDropdownMenu(item, button);  // Show dropdown
+                            }
+                        };
+
+                        this.Controls.Add(button);
+                    }
+                    else
+                    {
+                        var button = new Button
+                        {
+                            Text = fileName,
+                            Tag = item,
+                            Left = xOffset,
+                            Top = 5,
+                            Width = 150,
+                            Height = TopBarHeight - 10
+                        };
+
+                        // Add click event for regular files and folders
+                        button.Click += Item_Click;
+                        this.Controls.Add(button);
+                    }
+
+                    xOffset += 150 + 5;  // Move the button for the next item
                 }
             }
         }
 
+        private void ShowDropdownMenu(string folderPath, Control control)
+        {
+            var contextMenu = new ContextMenuStrip();
+
+            // Get the contents of the folder and add them as menu items
+            var items = Directory.GetFileSystemEntries(folderPath);
+            foreach (var item in items)
+            {
+                string itemName = Path.GetFileName(item);
+                string extension = Path.GetExtension(itemName).ToLower();
+
+                // Remove the extension if it's in the blacklist
+                if (Array.Exists(blacklistedExtensions, ext => ext == extension))
+                {
+                    itemName = Path.GetFileNameWithoutExtension(item);
+                }
+
+                // If the item is a folder and ends with "-menuitem", create a submenu
+                if (Directory.Exists(item) && itemName.EndsWith("-menuitem"))
+                {
+                    itemName = itemName.Replace("-menuitem", "");  // Remove the "-menuitem" suffix
+
+                    var subMenuItem = new ToolStripMenuItem(itemName)
+                    {
+                        Tag = item
+                    };
+
+                    // Recursively show dropdown for this subfolder
+                    var subMenu = new ContextMenuStrip();
+                    ShowDropdownMenuForSubFolder(item, subMenu);
+                    subMenuItem.DropDown = subMenu;
+
+                    contextMenu.Items.Add(subMenuItem);
+                }
+                else
+                {
+                    var menuItem = new ToolStripMenuItem(itemName)
+                    {
+                        Tag = item
+                    };
+
+                    menuItem.Click += (s, e) =>
+                    {
+                        // Open file or folder when clicked
+                        if (Directory.Exists(item))
+                        {
+                            Process.Start("explorer.exe", item); // Open folder
+                        }
+                        else if (File.Exists(item))
+                        {
+                            var process = new Process();
+                            process.StartInfo = new ProcessStartInfo
+                            {
+                                FileName = item,
+                                UseShellExecute = true // Use default app associated with file type
+                            };
+                            process.Start();
+                        }
+                    };
+
+                    contextMenu.Items.Add(menuItem);
+                }
+            }
+
+            // Show the dropdown menu at the button's location
+            contextMenu.Show(control, control.Width, 0);
+        }
+
+        // Method to show a dropdown menu recursively for subfolders
+        private void ShowDropdownMenuForSubFolder(string folderPath, ContextMenuStrip contextMenu)
+        {
+            var items = Directory.GetFileSystemEntries(folderPath);
+            foreach (var item in items)
+            {
+                string itemName = Path.GetFileName(item);
+                string extension = Path.GetExtension(itemName).ToLower();
+
+                // Remove the extension if it's in the blacklist
+                if (Array.Exists(blacklistedExtensions, ext => ext == extension))
+                {
+                    itemName = Path.GetFileNameWithoutExtension(item);
+                }
+
+                // If the item is a folder and ends with "-menuitem", create a submenu
+                if (Directory.Exists(item) && itemName.EndsWith("-menuitem"))
+                {
+                    itemName = itemName.Replace("-menuitem", "");  // Remove the "-menuitem" suffix
+
+                    var subMenuItem = new ToolStripMenuItem(itemName)
+                    {
+                        Tag = item
+                    };
+
+                    // Recursively create the dropdown for this subfolder
+                    var subMenu = new ContextMenuStrip();
+                    ShowDropdownMenuForSubFolder(item, subMenu);
+                    subMenuItem.DropDown = subMenu;
+
+                    contextMenu.Items.Add(subMenuItem);
+                }
+                else
+                {
+                    var menuItem = new ToolStripMenuItem(itemName)
+                    {
+                        Tag = item
+                    };
+
+                    menuItem.Click += (s, e) =>
+                    {
+                        // Open file or folder when clicked
+                        if (Directory.Exists(item))
+                        {
+                            Process.Start("explorer.exe", item); // Open folder
+                        }
+                        else if (File.Exists(item))
+                        {
+                            var process = new Process();
+                            process.StartInfo = new ProcessStartInfo
+                            {
+                                FileName = item,
+                                UseShellExecute = true // Use default app associated with file type
+                            };
+                            process.Start();
+                        }
+                    };
+
+                    contextMenu.Items.Add(menuItem);
+                }
+            }
+        }
+
+        private void Item_Click(object sender, EventArgs e)
+        {
+            var button = sender as Button;
+            var path = button.Tag.ToString();
+
+            if (Directory.Exists(path))
+            {
+                Process.Start("explorer.exe", path); // Open folder
+            }
+            else if (File.Exists(path))
+            {
+                var process = new Process();
+                process.StartInfo = new ProcessStartInfo
+                {
+                    FileName = path,
+                    UseShellExecute = true // Use the default app associated with the file type
+                };
+                process.Start();
+            }
+        }
+
+        private FileSystemWatcher watcher;  // FileSystemWatcher to monitor changes
 
         // Method to start watching the selected folder for changes
         private void StartWatchingFolder()
@@ -197,27 +380,6 @@ namespace mwm
             {
                 DisplayFolderContent();
             }));
-        }
-
-        private void Item_Click(object sender, EventArgs e)
-        {
-            var button = sender as Button;
-            var path = button.Tag.ToString();
-
-            if (Directory.Exists(path))
-            {
-                Process.Start("explorer.exe", path); // Open folder
-            }
-            else if (File.Exists(path))
-            {
-                var process = new Process();
-                process.StartInfo = new ProcessStartInfo
-                {
-                    FileName = path,
-                    UseShellExecute = true // Use the default app associated with the file type
-                };
-                process.Start();
-            }
         }
 
         public static void CreateTopBars()
