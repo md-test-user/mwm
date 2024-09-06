@@ -16,7 +16,7 @@ namespace mwm
         private const int ABE_TOP = 1;
 
         // Array of blacklisted extensions
-        private readonly string[] blacklistedExtensions = { ".lnk", ".exe", ".url", ".bat", ".cmd" };
+        private readonly string[] blacklistedExtensions = { ".lnk", ".exe", ".url", ".bat", ".cmd", ".ps1" };
 
         [StructLayout(LayoutKind.Sequential)]
         public struct APPBARDATA
