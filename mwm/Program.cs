@@ -29,6 +29,7 @@ namespace mwm
         {
             // Create a context menu for the tray icon
             trayMenu = new ContextMenuStrip();
+            trayMenu.Items.Add("Select Folder", null, OnSelectFolder);
             trayMenu.Items.Add("Exit", null, OnExit);
 
             // Create the tray icon
@@ -39,6 +40,18 @@ namespace mwm
                 ContextMenuStrip = trayMenu,
                 Visible = true
             };
+        }
+
+        // Event handler for selecting a folder
+        private static void OnSelectFolder(object sender, EventArgs e)
+        {
+            using (var folderDialog = new FolderBrowserDialog())
+            {
+                if (folderDialog.ShowDialog() == DialogResult.OK)
+                {
+                    Form1.UpdateTopBars(folderDialog.SelectedPath);
+                }
+            }
         }
 
         // Event handler for the "Exit" menu item

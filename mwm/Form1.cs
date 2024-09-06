@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
@@ -6,17 +8,15 @@ namespace mwm
 {
     public partial class Form1 : Form
     {
-        // Define a single variable for the height of the top bar
         private readonly int TopBarHeight = 30;
-
-        // Constants for AppBar messages
         private const int ABM_NEW = 0x00000000;
         private const int ABM_REMOVE = 0x00000001;
         private const int ABM_QUERYPOS = 0x00000002;
         private const int ABM_SETPOS = 0x00000003;
         private const int ABE_TOP = 1;
 
-        // Structure to hold information about the app bar
+        private FileSystemWatcher watcher;  // FileSystemWatcher to monitor changes
+
         [StructLayout(LayoutKind.Sequential)]
         public struct APPBARDATA
         {
@@ -37,7 +37,6 @@ namespace mwm
             public int bottom;
         }
 
-        // Import necessary functions from shell32.dll and user32.dll
         [DllImport("shell32.dll", SetLastError = true)]
         static extern uint SHAppBarMessage(uint dwMessage, ref APPBARDATA pData);
 
@@ -45,6 +44,7 @@ namespace mwm
         static extern int SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
         private Screen associatedScreen;
+        private static string selectedPath = string.Empty;
 
         public Form1(Screen screen)
         {
@@ -57,14 +57,16 @@ namespace mwm
         private void Form1_Loaded(object sender, EventArgs e)
         {
             RegisterAppBar();
+            DisplayFolderContent();
+            StartWatchingFolder();  // Start watching folder for changes
         }
 
         private void Form1_Closing(object sender, FormClosingEventArgs e)
         {
             UnregisterAppBar();
+            StopWatchingFolder();  // Stop watching folder when closing
         }
 
-        // Method to register the window as an app bar
         private void RegisterAppBar()
         {
             APPBARDATA abd = new APPBARDATA
@@ -74,17 +76,14 @@ namespace mwm
                 uEdge = ABE_TOP
             };
 
-            // Set the position and size of the app bar according to the associated screen
             abd.rc.left = associatedScreen.Bounds.Left;
             abd.rc.top = associatedScreen.Bounds.Top;
             abd.rc.right = associatedScreen.Bounds.Right;
             abd.rc.bottom = associatedScreen.Bounds.Top + TopBarHeight;
 
-            // Register the app bar
             SHAppBarMessage(ABM_NEW, ref abd);
             SHAppBarMessage(ABM_SETPOS, ref abd);
 
-            // Override the form's position to reclaim the full height on the respective screen
             this.Top = associatedScreen.Bounds.Top;
             this.Left = associatedScreen.Bounds.Left;
             this.Width = associatedScreen.Bounds.Width;
@@ -92,7 +91,6 @@ namespace mwm
             SetWindowPos(this.Handle, IntPtr.Zero, this.Left, this.Top, this.Width, this.Height, 0);
         }
 
-        // Method to unregister the app bar
         private void UnregisterAppBar()
         {
             APPBARDATA abd = new APPBARDATA
@@ -103,7 +101,125 @@ namespace mwm
             SHAppBarMessage(ABM_REMOVE, ref abd);
         }
 
-        // Static method to create and show the top bars on all screens
+        public static void UpdateTopBars(string path)
+        {
+            selectedPath = path;
+            foreach (Form barForm in Application.OpenForms)
+            {
+                if (barForm is Form1)
+                {
+                    ((Form1)barForm).DisplayFolderContent();
+                    ((Form1)barForm).StartWatchingFolder();  // Restart watching the new folder
+                }
+            }
+        }
+
+        // Method to display the contents of the folder
+        private readonly string[] blacklistedExtensions = { ".lnk", ".exe", ".url", ".bat", ".cmd" };
+
+        private void DisplayFolderContent()
+        {
+            this.Controls.Clear();
+            if (Directory.Exists(selectedPath))
+            {
+                var items = Directory.GetFileSystemEntries(selectedPath);
+                int xOffset = 10;
+
+                foreach (var item in items)
+                {
+                    string fileName = Path.GetFileName(item);
+                    string extension = Path.GetExtension(fileName).ToLower();
+
+                    // If the extension is in the blacklistedExtensions array, remove it from the displayed text
+                    if (Array.Exists(blacklistedExtensions, ext => ext == extension))
+                    {
+                        fileName = Path.GetFileNameWithoutExtension(item); // Remove the extension
+                    }
+
+                    var button = new Button
+                    {
+                        Text = fileName,
+                        Tag = item,
+                        Left = xOffset,
+                        Top = 5,
+                        Width = 150,
+                        Height = TopBarHeight - 10
+                    };
+                    button.Click += Item_Click;
+                    this.Controls.Add(button);
+
+                    xOffset += button.Width + 5;
+                }
+            }
+        }
+
+
+        // Method to start watching the selected folder for changes
+        private void StartWatchingFolder()
+        {
+            if (watcher != null)
+            {
+                watcher.Dispose();  // Dispose of any previous watcher
+            }
+
+            if (!string.IsNullOrEmpty(selectedPath) && Directory.Exists(selectedPath))
+            {
+                watcher = new FileSystemWatcher
+                {
+                    Path = selectedPath,
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName
+                };
+
+                // Hook up event handlers for changes in the directory
+                watcher.Created += OnFolderChanged;
+                watcher.Deleted += OnFolderChanged;
+                watcher.Renamed += OnFolderChanged;
+
+                watcher.EnableRaisingEvents = true;  // Start watching
+            }
+        }
+
+        // Method to stop watching the folder for changes
+        private void StopWatchingFolder()
+        {
+            if (watcher != null)
+            {
+                watcher.EnableRaisingEvents = false;
+                watcher.Dispose();
+            }
+        }
+
+        // Event handler for when the folder content changes (files added, removed, or renamed)
+        private void OnFolderChanged(object sender, FileSystemEventArgs e)
+        {
+            // Invoke the DisplayFolderContent method on the UI thread to update the display
+            this.Invoke(new Action(() =>
+            {
+                DisplayFolderContent();
+            }));
+        }
+
+        private void Item_Click(object sender, EventArgs e)
+        {
+            var button = sender as Button;
+            var path = button.Tag.ToString();
+
+            if (Directory.Exists(path))
+            {
+                Process.Start("explorer.exe", path); // Open folder
+            }
+            else if (File.Exists(path))
+            {
+                var process = new Process();
+                process.StartInfo = new ProcessStartInfo
+                {
+                    FileName = path,
+                    UseShellExecute = true // Use the default app associated with the file type
+                };
+                process.Start();
+            }
+        }
+
         public static void CreateTopBars()
         {
             foreach (var screen in Screen.AllScreens)
