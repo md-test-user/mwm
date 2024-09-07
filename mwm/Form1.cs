@@ -61,6 +61,14 @@ namespace mwm
             LoadConfigValues();  // Load blacklist extensions and default folder from config
 
             RegisterAppBar();
+
+            // If the default folder is invalid or empty, don't display anything
+            if (string.IsNullOrEmpty(defaultFolder) || !Directory.Exists(defaultFolder))
+            {
+                ClearUI();  // Clear UI if no valid folder
+                return;     // Exit early since we have nothing to show
+            }
+
             selectedPath = defaultFolder;  // Set default folder path
             DisplayFolderContent();
             StartWatchingFolder();  // Start watching folder for changes
@@ -75,12 +83,12 @@ namespace mwm
         // Load the config values (blacklisted extensions and default folder)
         private void LoadConfigValues()
         {
-            // Load default folder from config
+            // Load default folder from config and expand environment variables
             defaultFolder = ConfigManager.ReadSetting("DefaultFolder");
             if (string.IsNullOrEmpty(defaultFolder) || !Directory.Exists(defaultFolder))
             {
-                // If the config file has no default folder or it's invalid, fallback to C:\
-                defaultFolder = "C:\\";
+                // Set defaultFolder to null if invalid to ensure no content is shown
+                defaultFolder = null;
             }
 
             // Load blacklist extensions from config
@@ -140,10 +148,17 @@ namespace mwm
             }
         }
 
+        // Method to clear the UI
+        private void ClearUI()
+        {
+            this.Controls.Clear();
+        }
+
         // Method to display the contents of the folder
         private void DisplayFolderContent()
         {
-            this.Controls.Clear();
+            ClearUI();  // Clear the UI first
+
             if (Directory.Exists(selectedPath))
             {
                 var items = Directory.GetFileSystemEntries(selectedPath);

@@ -40,9 +40,12 @@ namespace mwm
             XDocument config = new XDocument(
                 new XElement("configuration",
                     new XElement("appSettings",
-                        new XElement("add", new XAttribute("key", "DefaultFolder"), new XAttribute("value", "C:\\")),
-                        new XElement("add", new XAttribute("key", "ShowHiddenFiles"), new XAttribute("value", "false")),
-                        new XElement("add", new XAttribute("key", "BlacklistExtensions"), new XAttribute("value", ".lnk,.exe,.url,.bat,.cmd,.ps1"))
+                        new XElement("add", new XAttribute("key", "DefaultFolder"), 
+                                     new XAttribute("value", @"%USERPROFILE%")),
+                        new XElement("add", new XAttribute("key", "ShowHiddenFiles"), 
+                                     new XAttribute("value", "false")),
+                        new XElement("add", new XAttribute("key", "BlacklistExtensions"), 
+                                     new XAttribute("value", ".lnk,.exe,.url,.bat,.cmd,.ps1"))
                     )
                 )
             );
@@ -51,19 +54,25 @@ namespace mwm
             config.Save(ConfigFilePath);
         }
 
-        // Reads a configuration setting by key
+        // Reads a configuration setting by key and expands environment variables
         public static string ReadSetting(string key)
         {
             if (!File.Exists(ConfigFilePath)) return null;
 
             var config = XDocument.Load(ConfigFilePath);
-            var setting = config.Root.Element("appSettings")?.Element("add");
-
             foreach (var element in config.Root.Element("appSettings").Elements("add"))
             {
                 if (element.Attribute("key")?.Value == key)
                 {
-                    return element.Attribute("value")?.Value;
+                    string value = element.Attribute("value")?.Value;
+
+                    // Expand any environment variables present in the value
+                    if (!string.IsNullOrEmpty(value))
+                    {
+                        return Environment.ExpandEnvironmentVariables(value);
+                    }
+
+                    return value;
                 }
             }
             return null;
