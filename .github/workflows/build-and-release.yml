@@ -17,7 +17,7 @@ jobs:
     - name: Setup .NET SDK
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: '8.x'
+        dotnet-version: '8.x'  # Use .NET 8 as per your project
 
     - name: Restore dependencies
       run: dotnet restore
@@ -57,7 +57,7 @@ jobs:
     - name: Create Tag
       id: create_tag
       run: |
-        $version = $env:GITHUB_ENV
+        $version = $env:VERSION
         $tagExists = git tag -l $version
         if (-not $tagExists) {
           git tag $version
