@@ -17,7 +17,7 @@ jobs:
     - name: Setup .NET SDK
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: '8.x'  # Use .NET 8 as per your project
+        dotnet-version: '8.x'
 
     - name: Restore dependencies
       run: dotnet restore
@@ -54,17 +54,23 @@ jobs:
         echo "VERSION=$version" >> $env:GITHUB_ENV
       shell: pwsh
 
-    - name: Create Tag
-      id: create_tag
+    - name: Check if Tag Exists Remotely
+      id: check_tag
       run: |
         $version = $env:VERSION
-        $tagExists = git tag -l $version
-        if (-not $tagExists) {
-          git tag $version
-          git push origin $version
-        } else {
-          Write-Host "Tag $version already exists, skipping tag creation"
+        $remoteTagExists = git ls-remote --tags origin | Select-String "refs/tags/$version"
+        if ($remoteTagExists) {
+          Write-Host "Tag $version already exists on remote, skipping tag creation"
+          exit 0
         }
+      shell: pwsh
+
+    - name: Create and Push Tag
+      if: steps.check_tag.outcome == 'success'
+      run: |
+        $version = $env:VERSION
+        git tag $version
+        git push origin $version
       shell: pwsh
 
     - name: Generate Release Notes
