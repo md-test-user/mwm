@@ -3,9 +3,9 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'  # This will trigger the action when you push a tag like v1.0.0
+      - 'v*'  # Trigger on tags like v1.0.0
 
-  workflow_dispatch:  # This allows manual triggering of the workflow
+  workflow_dispatch:  # Allow manual triggering
 
 jobs:
   build:
@@ -18,7 +18,7 @@ jobs:
     - name: Setup .NET SDK
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: '8.x'  # Use .NET 8 as per your project
+        dotnet-version: '8.x'  # .NET 8 for your project
 
     - name: Restore dependencies
       run: dotnet restore
@@ -33,8 +33,7 @@ jobs:
       run: |
         mkdir release
         cp -r ./mwm/bin/Release/net8.0-windows/win-x64/publish/* ./release/
-        cd release
-        zip -r ../release.zip ./
+        Compress-Archive -Path ./release/* -DestinationPath ./release.zip
 
     - name: Upload the artifact
       uses: actions/upload-artifact@v3
