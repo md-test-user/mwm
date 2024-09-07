@@ -56,10 +56,9 @@ namespace mwm
             this.FormClosing += Form1_Closing;
         }
 
-        private void Form1_Loaded(object sender, EventArgs e)
+        private void Form1_Loaded(object? sender, EventArgs e)
         {
-            LoadConfigValues();  // Load blacklist extensions and default folder from config
-
+            LoadConfigValues();
             RegisterAppBar();
 
             // If the default folder is invalid or empty, don't display anything

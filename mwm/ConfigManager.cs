@@ -36,16 +36,13 @@ namespace mwm
         // Create a default config file
         private static void CreateDefaultConfigFile()
         {
-            // Create a simple XML config structure with just the necessary appSettings
+
             XDocument config = new XDocument(
                 new XElement("configuration",
                     new XElement("appSettings",
-                        new XElement("add", new XAttribute("key", "DefaultFolder"), 
-                                     new XAttribute("value", @"%USERPROFILE%")),
-                        new XElement("add", new XAttribute("key", "ShowHiddenFiles"), 
-                                     new XAttribute("value", "false")),
-                        new XElement("add", new XAttribute("key", "BlacklistExtensions"), 
-                                     new XAttribute("value", ".lnk,.exe,.url,.bat,.cmd,.ps1"))
+                        new XElement("add", new XAttribute("key", "DefaultFolder"), new XAttribute("value", @"%USERPROFILE%")),
+                        new XElement("add", new XAttribute("key", "ShowHiddenFiles"), new XAttribute("value", "false")),
+                        new XElement("add", new XAttribute("key", "BlacklistExtensions"), new XAttribute("value", ".lnk,.exe,.url,.bat,.cmd,.ps1"))
                     )
                 )
             );

@@ -11,6 +11,7 @@ namespace mwm
         [STAThread]
         static void Main()
         {
+            ConfigManager.Initialize();
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
