@@ -11,8 +11,6 @@ namespace mwm
         [STAThread]
         static void Main()
         {
-            ConfigManager.Initialize();
-
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
@@ -31,8 +29,8 @@ namespace mwm
         {
             // Create a context menu for the tray icon
             trayMenu = new ContextMenuStrip();
-            trayMenu.Items.Add("Select Folder", null, OnSelectFolder);
-            trayMenu.Items.Add("Exit", null, OnExit);
+            trayMenu.Items.Add("Refresh", null, OnRefresh);  // Add "Refresh" option to menu
+            trayMenu.Items.Add("Exit", null, OnExit);  // Add "Exit" option to menu
 
             // Create the tray icon
             trayIcon = new NotifyIcon
@@ -44,16 +42,11 @@ namespace mwm
             };
         }
 
-        // Event handler for selecting a folder
-        private static void OnSelectFolder(object sender, EventArgs e)
+        // Event handler for the "Refresh" menu item
+        private static void OnRefresh(object sender, EventArgs e)
         {
-            using (var folderDialog = new FolderBrowserDialog())
-            {
-                if (folderDialog.ShowDialog() == DialogResult.OK)
-                {
-                    Form1.UpdateTopBars(folderDialog.SelectedPath);
-                }
-            }
+            // Reapply settings and refresh all top bars
+            Form1.RefreshTopBars();
         }
 
         // Event handler for the "Exit" menu item

@@ -148,6 +148,25 @@ namespace mwm
             }
         }
 
+        // Static method to refresh all top bars
+        public static void RefreshTopBars()
+        {
+            foreach (Form barForm in Application.OpenForms)
+            {
+                if (barForm is Form1 form)
+                {
+                    form.LoadConfigValues();   // Re-load the configuration
+                    form.ClearUI();            // Clear the current UI
+                    if (!string.IsNullOrEmpty(form.defaultFolder) && Directory.Exists(form.defaultFolder))
+                    {
+                        selectedPath = form.defaultFolder;  // Set the new path
+                        form.DisplayFolderContent();        // Display the folder content again
+                        form.StartWatchingFolder();         // Restart folder watching
+                    }
+                }
+            }
+        }
+
         // Method to clear the UI
         private void ClearUI()
         {
