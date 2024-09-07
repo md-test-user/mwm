@@ -1,58 +1,91 @@
 name: Build and Release
 
-on:
-  push:
-    tags:
-      - 'v*'  # Trigger on tags like v1.0.0
+permissions:
+  contents: write
+  actions: read
 
-  workflow_dispatch:  # Allow manual triggering
+on:
+  workflow_dispatch:  # Manual trigger
 
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
-    - name: Checkout repository
+    - name: Checkout Repository
       uses: actions/checkout@v3
 
     - name: Setup .NET SDK
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: '8.x'  # .NET 8 for your project
+        dotnet-version: '8.x'  # Use .NET 8 as per your project
 
     - name: Restore dependencies
       run: dotnet restore
 
-    - name: Build solution
+    - name: Build project
       run: dotnet build --configuration Release
 
-    - name: Publish the project (Generate .exe)
+    - name: Publish project
       run: dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
 
-    - name: Archive the executable
+    - name: Archive executable
       run: |
         mkdir release
         cp -r ./mwm/bin/Release/net8.0-windows/win-x64/publish/* ./release/
         Compress-Archive -Path ./release/* -DestinationPath ./release.zip
 
-    - name: Upload the artifact
+    - name: Upload artifact
       uses: actions/upload-artifact@v3
       with:
         name: my-exe
         path: release.zip
 
-  release:
+  create-tag-and-release:
     needs: build
     runs-on: windows-latest
     steps:
-    - name: Download artifact
-      uses: actions/download-artifact@v3
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Set version to today's date
+      id: set_version
+      run: |
+        $version = (Get-Date -Format "yy.MM.dd")
+        echo "VERSION=$version" >> $env:GITHUB_ENV
+      shell: pwsh
+
+    - name: Create Tag
+      id: create_tag
+      run: |
+        $tagExists = git tag -l $env:VERSION
+        if ($tagExists -eq "") {
+          git tag $env:VERSION
+          git push origin $env:VERSION
+        } else {
+          Write-Host "Tag $env:VERSION already exists, skipping tag creation"
+        }
+      shell: pwsh
+
+    - name: Generate Release Notes
+      id: generate_notes
+      uses: release-drafter/release-drafter@v5
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        name: my-exe
+        config-name: release-drafter.yml
+        version: ${{ env.VERSION }}
 
     - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
+      id: create_release
+      uses: softprops/action-gh-release@v2
       with:
-        files: release.zip
+        tag_name: ${{ env.VERSION }}
+        name: Release ${{ env.VERSION }}
+        body: |
+          ${{ steps.generate_notes.outputs.body }}
+          
+          ![GitHub Downloads (specific asset, specific tag)](https://img.shields.io/github/downloads/${{ github.repository }}/${{ env.VERSION }}/release.zip)
+        append_body: false
+        files: ./release.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
