@@ -17,7 +17,7 @@ jobs:
     - name: Setup .NET SDK
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: '8.x'  # Use .NET 8 as per your project
+        dotnet-version: '8.x'
 
     - name: Restore dependencies
       run: dotnet restore
@@ -57,12 +57,14 @@ jobs:
     - name: Create Tag
       id: create_tag
       run: |
-        $tagExists = git tag -l $env:VERSION
-        if ($tagExists -eq "") {
-          git tag $env:VERSION
-          git push origin $env:VERSION
+        $version = $env:GITHUB_ENV
+        $tagExists = git tag -l $version
+        if (-not $tagExists) {
+          git tag $version
+          git push origin $version
         } else {
-          Write-Host "Tag $env:VERSION already exists, skipping tag creation"
+          Write-Host "Tag $version already exists, skipping tag creation"
+        }
       shell: pwsh
 
     - name: Generate Release Notes
@@ -85,6 +87,6 @@ jobs:
           
           ![GitHub Downloads (specific asset, specific tag)](https://img.shields.io/github/downloads/${{ github.repository }}/${{ env.VERSION }}/release.zip)
         append_body: false
-        files: ./release.zip  # Attaching the compiled .exe as a zip file
+        files: ./release.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
