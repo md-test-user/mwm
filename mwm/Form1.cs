@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
@@ -15,8 +16,8 @@ namespace mwm
         private const int ABM_SETPOS = 0x00000003;
         private const int ABE_TOP = 1;
 
-        // Array of blacklisted extensions
-        private readonly string[] blacklistedExtensions = { ".lnk", ".exe", ".url", ".bat", ".cmd", ".ps1" };
+        private string[] blacklistedExtensions = Array.Empty<string>();
+        private string defaultFolder;
 
         [StructLayout(LayoutKind.Sequential)]
         public struct APPBARDATA
@@ -57,7 +58,10 @@ namespace mwm
 
         private void Form1_Loaded(object sender, EventArgs e)
         {
+            LoadConfigValues();  // Load blacklist extensions and default folder from config
+
             RegisterAppBar();
+            selectedPath = defaultFolder;  // Set default folder path
             DisplayFolderContent();
             StartWatchingFolder();  // Start watching folder for changes
         }
@@ -66,6 +70,27 @@ namespace mwm
         {
             UnregisterAppBar();
             StopWatchingFolder();  // Stop watching folder when closing
+        }
+
+        // Load the config values (blacklisted extensions and default folder)
+        private void LoadConfigValues()
+        {
+            // Load default folder from config
+            defaultFolder = ConfigManager.ReadSetting("DefaultFolder");
+            if (string.IsNullOrEmpty(defaultFolder) || !Directory.Exists(defaultFolder))
+            {
+                // If the config file has no default folder or it's invalid, fallback to C:\
+                defaultFolder = "C:\\";
+            }
+
+            // Load blacklist extensions from config
+            string blacklistSetting = ConfigManager.ReadSetting("BlacklistExtensions");
+            if (!string.IsNullOrEmpty(blacklistSetting))
+            {
+                blacklistedExtensions = blacklistSetting.Split(',')
+                                                        .Select(ext => ext.Trim().ToLower())
+                                                        .ToArray();
+            }
         }
 
         private void RegisterAppBar()
@@ -129,8 +154,8 @@ namespace mwm
                     string fileName = Path.GetFileName(item);
                     string extension = Path.GetExtension(fileName).ToLower();
 
-                    // Remove the extension if it's in the blacklist
-                    if (Array.Exists(blacklistedExtensions, ext => ext == extension))
+                    // If the file's extension is blacklisted, remove the extension but still show the file
+                    if (blacklistedExtensions.Contains(extension))
                     {
                         fileName = Path.GetFileNameWithoutExtension(item);
                     }
@@ -194,8 +219,8 @@ namespace mwm
                 string itemName = Path.GetFileName(item);
                 string extension = Path.GetExtension(itemName).ToLower();
 
-                // Remove the extension if it's in the blacklist
-                if (Array.Exists(blacklistedExtensions, ext => ext == extension))
+                // If the file's extension is blacklisted, remove the extension but still show the file
+                if (blacklistedExtensions.Contains(extension))
                 {
                     itemName = Path.GetFileNameWithoutExtension(item);
                 }
@@ -260,8 +285,8 @@ namespace mwm
                 string itemName = Path.GetFileName(item);
                 string extension = Path.GetExtension(itemName).ToLower();
 
-                // Remove the extension if it's in the blacklist
-                if (Array.Exists(blacklistedExtensions, ext => ext == extension))
+                // If the file's extension is blacklisted, remove the extension but still show the file
+                if (blacklistedExtensions.Contains(extension))
                 {
                     itemName = Path.GetFileNameWithoutExtension(item);
                 }
