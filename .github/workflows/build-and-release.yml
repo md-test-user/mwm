@@ -1,0 +1,57 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # This will trigger the action when you push a tag like v1.0.0
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.x'  # Use .NET 8 as per your project
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build solution
+      run: dotnet build --configuration Release
+
+    - name: Publish the project (Generate .exe)
+      run: dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
+
+    - name: Archive the executable
+      run: |
+        mkdir release
+        cp -r ./mwm/bin/Release/net8.0-windows/win-x64/publish/* ./release/
+        cd release
+        zip -r ../release.zip ./
+
+    - name: Upload the artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: my-exe
+        path: release.zip
+
+  release:
+    needs: build
+    runs-on: windows-latest
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: my-exe
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: release.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
