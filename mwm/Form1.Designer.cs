@@ -10,6 +10,7 @@
             // 
             this.ClientSize = new System.Drawing.Size(800, 450);
             this.Name = "Form1";
+            this.Icon = Properties.Resources.logo;
             this.ResumeLayout(false);
         }
     }

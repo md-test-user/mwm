@@ -36,7 +36,7 @@ namespace mwm
             // Create the tray icon
             trayIcon = new NotifyIcon
             {
-                Text = "Top Bar",
+                Text = "MWM",
                 Icon = Properties.Resources.logo,
                 ContextMenuStrip = trayMenu,
                 Visible = true

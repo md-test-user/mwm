@@ -121,6 +121,7 @@ namespace mwm
             this.Left = associatedScreen.Bounds.Left;
             this.Width = associatedScreen.Bounds.Width;
             this.Height = TopBarHeight;
+            this.Icon = Properties.Resources.logo;
             SetWindowPos(this.Handle, IntPtr.Zero, this.Left, this.Top, this.Width, this.Height, 0);
         }
 
