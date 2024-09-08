@@ -1,0 +1,98 @@
+name: Build and Release
+
+permissions:
+  contents: write
+  actions: read
+
+on:
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.x'
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build project
+      run: dotnet build --configuration Release
+
+    - name: Publish project (Generate .exe)
+      run: dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
+
+    - name: Archive executable
+      run: |
+        mkdir release
+        cp -r ./mwm/bin/Release/net8.0-windows/win-x64/publish/* ./release/
+        Compress-Archive -Path ./release/* -DestinationPath ./release.zip
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: my-exe
+        path: release.zip
+
+  create-tag-and-release:
+    needs: build
+    runs-on: windows-latest
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Set version to today's date
+      id: set_version
+      run: |
+        $version = (Get-Date -Format "yy.MM.dd")
+        echo "VERSION=$version" >> $env:GITHUB_ENV
+      shell: pwsh
+
+    - name: Check if Tag Exists Remotely
+      id: check_tag
+      run: |
+        $version = $env:VERSION
+        $remoteTagExists = git ls-remote --tags origin | Select-String "refs/tags/$version"
+        if ($remoteTagExists) {
+          Write-Host "Tag $version already exists on remote, skipping tag creation"
+          exit 0
+        }
+      shell: pwsh
+
+    - name: Create and Push Tag
+      if: steps.check_tag.outcome == 'success'
+      run: |
+        $version = $env:VERSION
+        git tag $version
+        git push origin $version
+      shell: pwsh
+
+    - name: Generate Release Notes
+      id: generate_notes
+      uses: release-drafter/release-drafter@v5
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        config-name: release-drafter.yml
+        version: ${{ env.VERSION }}
+
+    - name: Create GitHub Release with Compiled .exe
+      id: create_release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ env.VERSION }}
+        name: Release ${{ env.VERSION }}
+        body: |
+          ${{ steps.generate_notes.outputs.body }}
+          
+          ![GitHub Downloads (specific asset, specific tag)](https://img.shields.io/github/downloads/${{ github.repository }}/${{ env.VERSION }}/release.zip)
+        append_body: false
+        files: ./release.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
