@@ -37,7 +37,7 @@ namespace mwm
             trayIcon = new NotifyIcon
             {
                 Text = "Top Bar",
-                Icon = SystemIcons.Application, // You can customize this with your own icon
+                Icon = Properties.Resources.logo,
                 ContextMenuStrip = trayMenu,
                 Visible = true
             };
