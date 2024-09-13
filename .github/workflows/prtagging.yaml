@@ -16,7 +16,7 @@ jobs:
     - name: Check out the repository
       uses: actions/checkout@v3
 
-    - name: Add or remove labels based on PR description
+    - name: Debug and Apply Labels
       id: label
       run: |
         # Read the PR body and store it in a variable
@@ -32,8 +32,13 @@ jobs:
           ["Documentation update"]="documentation"
         )
 
+        # Debug: Output PR body to ensure it's being read correctly
+        echo "PR Body:"
+        echo "$PR_BODY"
+
         # Add a label to the PR using the GitHub API
         function add_label() {
+          echo "Adding label: $1"
           curl -s -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
@@ -43,6 +48,7 @@ jobs:
 
         # Remove a label from the PR using the GitHub API
         function remove_label() {
+          echo "Removing label: $1"
           curl -s -X DELETE \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
@@ -50,23 +56,34 @@ jobs:
         }
 
         # Get the current labels on the PR
+        echo "Fetching current labels..."
         CURRENT_LABELS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
           https://api.github.com/repos/$REPO_NAME/issues/$PR_NUMBER | jq -r '.labels[].name')
 
+        echo "Current Labels: $CURRENT_LABELS"
+
         # Loop through the label mappings and add or remove labels based on checkboxes
         for checkbox in "${!label_map[@]}"; do
           label="${label_map[$checkbox]}"
-          
-          if [[ "$PR_BODY" =~ "- \[x\] $checkbox" ]]; then
+
+          # Debug: Show what checkbox is being processed
+          echo "Processing checkbox: $checkbox"
+
+          # Use a stricter regex to match checkboxes like "- [x] New feature"
+          if echo "$PR_BODY" | grep -qE "\- \[[xX]\] $checkbox"; then
             # If checkbox is checked and label is not already applied, add it
             if [[ ! "$CURRENT_LABELS" =~ "$label" ]]; then
               add_label "$label"
+            else
+              echo "Label '$label' already exists, skipping..."
             fi
           else
             # If checkbox is unchecked and label is applied, remove it
             if [[ "$CURRENT_LABELS" =~ "$label" ]]; then
               remove_label "$label"
+            else
+              echo "Label '$label' not applied, nothing to remove."
             fi
           fi
         done
