@@ -17,6 +17,8 @@ jobs:
       run: |
         # Read the PR body and store it in a variable
         PR_BODY="${{ github.event.pull_request.body }}"
+        PR_NUMBER="${{ github.event.pull_request.number }}"
+        REPO_NAME="${{ github.repository }}"
 
         # Define the mappings of checkboxes to labels
         declare -A label_map=(
@@ -26,27 +28,43 @@ jobs:
           ["Documentation update"]="documentation"
         )
 
-        # Function to check if a label exists
-        function label_exists() {
-          gh pr view ${{ github.event.pull_request.number }} --json labels --jq ".labels[].name" | grep -qx "$1"
+        # Add a label to the PR using the GitHub API
+        function add_label() {
+          curl -s -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/$REPO_NAME/issues/$PR_NUMBER/labels \
+            -d "{\"labels\":[\"$1\"]}"
         }
+
+        # Remove a label from the PR using the GitHub API
+        function remove_label() {
+          curl -s -X DELETE \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/$REPO_NAME/issues/$PR_NUMBER/labels/$1
+        }
+
+        # Get the current labels on the PR
+        CURRENT_LABELS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/$REPO_NAME/issues/$PR_NUMBER | jq -r '.labels[].name')
 
         # Loop through the label mappings and add or remove labels based on checkboxes
         for checkbox in "${!label_map[@]}"; do
           label="${label_map[$checkbox]}"
           
           if [[ "$PR_BODY" =~ "- \[x\] $checkbox" ]]; then
-            # If checkbox is checked and label does not exist, add it
-            if ! label_exists "$label"; then
-              gh pr edit ${{ github.event.pull_request.number }} --add-label "$label"
+            # If checkbox is checked and label is not already applied, add it
+            if [[ ! "$CURRENT_LABELS" =~ "$label" ]]; then
+              add_label "$label"
             fi
           else
-            # If checkbox is unchecked and label exists, remove it
-            if label_exists "$label"; then
-              gh pr edit ${{ github.event.pull_request.number }} --remove-label "$label"
+            # If checkbox is unchecked and label is applied, remove it
+            if [[ "$CURRENT_LABELS" =~ "$label" ]]; then
+              remove_label "$label"
             fi
           fi
         done
-
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
