@@ -1,0 +1,52 @@
+name: Auto Label PR
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out the repository
+      uses: actions/checkout@v3
+
+    - name: Add or remove labels based on PR description
+      id: label
+      run: |
+        # Read the PR body and store it in a variable
+        PR_BODY="${{ github.event.pull_request.body }}"
+
+        # Define the mappings of checkboxes to labels
+        declare -A label_map=(
+          ["New feature"]="enhancement"
+          ["Bug fix"]="bug"
+          ["Hotfix"]="bug"
+          ["Documentation update"]="documentation"
+        )
+
+        # Function to check if a label exists
+        function label_exists() {
+          gh pr view ${{ github.event.pull_request.number }} --json labels --jq ".labels[].name" | grep -qx "$1"
+        }
+
+        # Loop through the label mappings and add or remove labels based on checkboxes
+        for checkbox in "${!label_map[@]}"; do
+          label="${label_map[$checkbox]}"
+          
+          if [[ "$PR_BODY" =~ "- \[x\] $checkbox" ]]; then
+            # If checkbox is checked and label does not exist, add it
+            if ! label_exists "$label"; then
+              gh pr edit ${{ github.event.pull_request.number }} --add-label "$label"
+            fi
+          else
+            # If checkbox is unchecked and label exists, remove it
+            if label_exists "$label"; then
+              gh pr edit ${{ github.event.pull_request.number }} --remove-label "$label"
+            fi
+          fi
+        done
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
