@@ -1,91 +1,32 @@
-name: Auto Label PR
+name: Check for New Feature Label
 
 on:
   pull_request:
     types: [opened, edited, synchronize]
 
-permissions:
-  contents: write
-  pull-requests: write
-
 jobs:
-  label:
+  check-new-feature:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Check out the repository
-      uses: actions/checkout@v3
-
-    - name: Debug and Apply Labels
-      id: label
-      run: |
-        # Read the PR body and store it in a variable
-        PR_BODY="${{ github.event.pull_request.body }}"
-        PR_NUMBER="${{ github.event.pull_request.number }}"
-        REPO_NAME="${{ github.repository }}"
-
-        # Define the mappings of checkboxes to labels
-        declare -A label_map=(
-          ["New feature"]="enhancement"
-          ["Bug fix"]="bug"
-          ["Hotfix"]="bug"
-          ["Documentation update"]="documentation"
-        )
-
-        # Debug: Output PR body to ensure it's being read correctly
-        echo "PR Body:"
-        echo "$PR_BODY"
-
-        # Add a label to the PR using the GitHub API
-        function add_label() {
-          echo "Adding label: $1"
-          curl -s -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/$REPO_NAME/issues/$PR_NUMBER/labels \
-            -d "{\"labels\":[\"$1\"]}"
-        }
-
-        # Remove a label from the PR using the GitHub API
-        function remove_label() {
-          echo "Removing label: $1"
-          curl -s -X DELETE \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/$REPO_NAME/issues/$PR_NUMBER/labels/$1
-        }
-
-        # Get the current labels on the PR
-        echo "Fetching current labels..."
-        CURRENT_LABELS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-          -H "Accept: application/vnd.github.v3+json" \
-          https://api.github.com/repos/$REPO_NAME/issues/$PR_NUMBER | jq -r '.labels[].name')
-
-        echo "Current Labels: $CURRENT_LABELS"
-
-        # Loop through the label mappings and add or remove labels based on checkboxes
-        for checkbox in "${!label_map[@]}"; do
-          label="${label_map[$checkbox]}"
-
-          # Debug: Show what checkbox is being processed
-          echo "Processing checkbox: $checkbox"
-
-          # Use a stricter regex to match checkboxes like "- [x] New feature"
-          if echo "$PR_BODY" | grep -qE "\- \[[xX]\] $checkbox"; then
-            # If checkbox is checked and label is not already applied, add it
-            if [[ ! "$CURRENT_LABELS" =~ "$label" ]]; then
-              add_label "$label"
-            else
-              echo "Label '$label' already exists, skipping..."
-            fi
+      - name: Check if PR contains `[x] New feature`
+        id: check_new_feature
+        run: |
+          if grep -q "\[x\] New feature" <<<"${{ github.event.pull_request.body }}"; then
+            echo "new_feature=true" >> $GITHUB_ENV
           else
-            # If checkbox is unchecked and label is applied, remove it
-            if [[ "$CURRENT_LABELS" =~ "$label" ]]; then
-              remove_label "$label"
-            else
-              echo "Label '$label' not applied, nothing to remove."
-            fi
-          fi
-        done
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            echo "new_feature=false" >> $GITHUB_ENV
+
+      - name: Add or remove `enhancement` label
+        if: always() # This ensures that this step runs whether the previous step succeeds or fails.
+        run: |
+          NEW_FEATURE="${{ env.new_feature }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+
+          if [ "$NEW_FEATURE" == "true" ]; then
+            echo "Adding enhancement label..."
+            gh pr edit "$PR_NUMBER" --add-label "enhancement"
+          else
+            echo "Removing enhancement label if it exists..."
+            gh pr edit "$PR_NUMBER" --remove-label "enhancement"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
