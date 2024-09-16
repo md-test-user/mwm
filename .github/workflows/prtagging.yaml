@@ -26,7 +26,7 @@ jobs:
           labels_to_remove=()
 
           for label in "${!label_patterns[@]}"; do
-            if echo "$body" | grep -Eq "${label_patterns[$label]}"; then
+            if echo "$body" | grep -Pq "${label_patterns[$label]}"; then
               # Add label if any of the patterns are found
               labels_to_add+=("\"$label\"")
             else
