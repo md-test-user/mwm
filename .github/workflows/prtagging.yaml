@@ -40,18 +40,23 @@ jobs:
             labels_to_remove+=("documentation")
           fi
 
-          # Export the labels to add and remove as environment variables
+          # Export the labels to add and remove as environment variables (formatted as space-separated lists)
           echo "LABELS_TO_ADD=${labels_to_add[*]}" >> $GITHUB_ENV
           echo "LABELS_TO_REMOVE=${labels_to_remove[*]}" >> $GITHUB_ENV
 
       - name: Add labels if necessary
         if: env.LABELS_TO_ADD != ''
-        uses: actions-ecosystem/action-add-labels@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          labels: ${{ env.LABELS_TO_ADD }}
+        run: |
+          for label in ${{ env.LABELS_TO_ADD }}; do
+            curl -s -X POST \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              -d "{\"labels\": [\"$label\"]}" \
+              https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels
+          done
 
       - name: Remove labels if necessary
+        if: env.LABELS_TO_REMOVE != ''
         run: |
           for label in ${{ env.LABELS_TO_REMOVE }}; do
             curl -s -X DELETE \
