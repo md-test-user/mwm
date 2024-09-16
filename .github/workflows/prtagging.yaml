@@ -10,33 +10,49 @@ jobs:
 
     steps:
       - name: Check PR body and manage labels
-        env:
-          GITHUB_TOKEN: ${{ secrets.PAT_GITHUB }}
-        run: |
-          # Install jq for JSON parsing
-          sudo apt-get update && sudo apt-get install -y jq
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.PAT_GITHUB }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const prBody = context.payload.pull_request.body || "";
 
-          # Get PR details
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          OWNER=${{ github.event.repository.owner.login }}
-          REPO=${{ github.event.repository.name }}
+            console.log("PR Body:", prBody);
 
-          # Get PR body
-          PR_BODY=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-            https://api.github.com/repos/$OWNER/$REPO/pulls/$PR_NUMBER | jq -r '.body')
+            const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
 
-          # Check for '- [x] New feature'
-          if echo "$PR_BODY" | grep -q '\- \[x\] New feature'; then
-            echo "New feature checked."
-            # Add 'enhancement' label
-            curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" \
-              -H "Accept: application/vnd.github.v3+json" \
-              https://api.github.com/repos/$OWNER/$REPO/issues/$PR_NUMBER/labels \
-              -d '{"labels":["enhancement"]}'
-          else
-            echo "New feature not checked."
-            # Remove 'enhancement' label if it exists
-            curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
-              -H "Accept: application/vnd.github.v3+json" \
-              https://api.github.com/repos/$OWNER/$REPO/issues/$PR_NUMBER/labels/enhancement
-          fi
+            const labels = currentLabels.map(label => label.name);
+            const hasEnhancementLabel = labels.includes("enhancement");
+
+            // Normalize the PR body for matching
+            const prBodyNormalized = prBody.toLowerCase().replace(/\s+/g, ' ');
+            const newFeatureChecked = prBodyNormalized.includes('- [x] new feature');
+
+            console.log("Has 'enhancement' label:", hasEnhancementLabel);
+            console.log("Is 'New feature' checked:", newFeatureChecked);
+
+            if (newFeatureChecked && !hasEnhancementLabel) {
+              // Add the "enhancement" label
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: ["enhancement"],
+              });
+              console.log('Added "enhancement" label.');
+            } else if (!newFeatureChecked && hasEnhancementLabel) {
+              // Remove the "enhancement" label
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                name: "enhancement",
+              });
+              console.log('Removed "enhancement" label.');
+            } else {
+              console.log('No action needed.');
+            }
