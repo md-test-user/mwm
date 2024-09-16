@@ -14,11 +14,13 @@ jobs:
       - name: Check for "New feature" in PR body
         id: check-body
         run: |
-          if echo "${{ github.event.pull_request.body }}" | grep -q '\- \[x\] New feature'; then
+          PR_BODY=$(echo "${{ github.event.pull_request.body }}")
+          if echo "$PR_BODY" | grep -q '\- \[x\] New feature'; then
             echo "contains_feature=true" >> $GITHUB_ENV
           else
             echo "contains_feature=false" >> $GITHUB_ENV
-          
+          fi
+
       - name: Check if PR has "enhancement" label
         id: check-label
         run: |
@@ -27,6 +29,7 @@ jobs:
             echo "has_enhancement_label=true" >> $GITHUB_ENV
           else
             echo "has_enhancement_label=false" >> $GITHUB_ENV
+          fi
           
       - name: Add "enhancement" label if checkbox is checked
         if: env.contains_feature == 'true' && env.has_enhancement_label == 'false'
