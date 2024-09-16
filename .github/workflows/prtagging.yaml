@@ -1,36 +1,40 @@
-name: Manage enhancement label on PR
+name: Manage labels based on PR body
 
 on:
   pull_request:
     types: [opened, edited, reopened, synchronize, labeled, unlabeled, ready_for_review, review_requested, review_request_removed]
 
 jobs:
-  manage-label:
+  manage-labels:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v2
 
-      - name: Analyze PR Body
-        id: check-body
+      - name: Analyze PR Body and manage labels
         run: |
-          if echo "${{ github.event.pull_request.body }}" | grep -q '\- \[x\] New feature'; then
-            echo "contains_feature=true" >> $GITHUB_ENV
-          else
-            echo "contains_feature=false" >> $GITHUB_ENV
-          fi
+          body="${{ github.event.pull_request.body }}"
 
-      - name: Add enhancement label if feature is checked
-        if: env.contains_feature == 'true'
-        uses: actions-ecosystem/action-add-labels@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          labels: "enhancement"
+          # Define label rules: each pair is [label_name, search_pattern]
+          declare -A label_patterns=(
+            ["enhancement"]="- \[x\] New feature"
+            ["bug"]="- \[x\] Bug fix\|- \[x\] Hotfix\|- \[x\] Security patch"
+            ["documentation"]="- \[x\] Documentation update"
+          )
 
-      - name: Remove enhancement label if feature is unchecked
-        if: env.contains_feature == 'false'
-        run: |
-          curl -s -X DELETE \
-          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-          -H "Accept: application/vnd.github.v3+json" \
-          https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels/enhancement
+          for label in "${!label_patterns[@]}"; do
+            if echo "$body" | grep -q "${label_patterns[$label]}"; then
+              # Add label if checkbox is checked
+              curl -s -X POST \
+                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                -H "Accept: application/vnd.github.v3+json" \
+                -d "{\"labels\": [\"$label\"]}" \
+                https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels
+            else
+              # Remove label if checkbox is unchecked
+              curl -s -X DELETE \
+                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                -H "Accept: application/vnd.github.v3+json" \
+                https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels/$label
+            fi
+          done
