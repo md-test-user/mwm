@@ -8,9 +8,6 @@ jobs:
   manage-labels:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v2
-
       - name: Analyze PR Body and manage labels
         run: |
           body="${{ github.event.pull_request.body }}"
