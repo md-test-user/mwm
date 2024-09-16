@@ -12,7 +12,7 @@ jobs:
       - name: Check PR body and manage labels
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.PAT_GITHUB }}
+          token: ${{ secrets.PAT_GITHUB }}
           script: |
             const prNumber = context.payload.pull_request.number;
             const prBody = context.payload.pull_request.body || "";
