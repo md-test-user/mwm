@@ -15,39 +15,47 @@ jobs:
         run: |
           body="${{ github.event.pull_request.body }}"
 
-          # Define label rules: each pair is [label_name, search_patterns (separated by \|)]
-          declare -A label_patterns=(
-            ["enhancement"]="- \[x\] New feature"
-            ["bug"]="- \[x\] Bug fix\|- \[x\] Hotfix\|- \[x\] Security patch"
-            ["documentation"]="- \[x\] Documentation update"
-          )
-
+          # Initialize the labels to be added and removed
           labels_to_add=()
           labels_to_remove=()
 
-          for label in "${!label_patterns[@]}"; do
-            if echo "$body" | grep -Pq "${label_patterns[$label]}"; then
-              # Add label if any of the patterns are found
-              labels_to_add+=("\"$label\"")
-            else
-              # Remove label if none of the patterns match
-              labels_to_remove+=("\"$label\"")
-            fi
-          done
-
-          # Add labels if any
-          if [ ${#labels_to_add[@]} -gt 0 ]; then
-            curl -s -X POST \
-              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              -H "Accept: application/vnd.github.v3+json" \
-              -d "{\"labels\": [$(IFS=,; echo "${labels_to_add[*]}")]}" \
-              https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels
+          # Check for enhancement
+          if echo "$body" | grep -q '\- \[x\] New feature'; then
+            labels_to_add+=("enhancement")
+          else
+            labels_to_remove+=("enhancement")
           fi
 
-          # Remove labels if any
-          for label in "${labels_to_remove[@]}"; do
+          # Check for bug-related labels (Bug fix, Hotfix, Security patch)
+          if echo "$body" | grep -q '\- \[x\] Bug fix\|\- \[x\] Hotfix\|\- \[x\] Security patch'; then
+            labels_to_add+=("bug")
+          else
+            labels_to_remove+=("bug")
+          fi
+
+          # Check for documentation update
+          if echo "$body" | grep -q '\- \[x\] Documentation update'; then
+            labels_to_add+=("documentation")
+          else
+            labels_to_remove+=("documentation")
+          fi
+
+          # Export the labels to add and remove as environment variables
+          echo "LABELS_TO_ADD=${labels_to_add[*]}" >> $GITHUB_ENV
+          echo "LABELS_TO_REMOVE=${labels_to_remove[*]}" >> $GITHUB_ENV
+
+      - name: Add labels if necessary
+        if: env.LABELS_TO_ADD != ''
+        uses: actions-ecosystem/action-add-labels@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          labels: ${{ env.LABELS_TO_ADD }}
+
+      - name: Remove labels if necessary
+        run: |
+          for label in ${{ env.LABELS_TO_REMOVE }}; do
             curl -s -X DELETE \
               -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
               -H "Accept: application/vnd.github.v3+json" \
-              https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels/$(echo $label | tr -d '"')
+              https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels/$label
           done
