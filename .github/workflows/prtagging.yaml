@@ -16,7 +16,9 @@ jobs:
           labels_to_remove=()
           declare -A label_checks=(
             ["New feature"]="enhancement"
-            ["Bug fix|Hotfix|Security patch"]="bug"
+            ["Bug fix"]="bug"
+            ["Hotfix"]="bug"
+            ["Security patch"]="bug"
             ["Documentation update"]="documentation"
             ["Refactoring"]="refactor"
             ["UI/UX improvement"]="UI/UX"
