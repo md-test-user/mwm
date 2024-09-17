@@ -15,19 +15,25 @@ jobs:
           labels_to_add=()
           labels_to_remove=()
           declare -A label_checks=(
-            ["New feature"]="enhancement"
-            ["Bug fix"]="bug"
-            ["Hotfix"]="bug"
-            ["Security patch"]="bug"
-            ["Documentation update"]="documentation"
-            ["Refactoring"]="refactor"
-            ["UI/UX improvement"]="UI/UX"
+            ["enhancement"]="New feature"
+            ["bug"]="Bug fix Hotfix Security patch"
+            ["documentation"]="Documentation update"
+            ["refactor"]="Refactoring"
+            ["UI/UX"]="UI/UX improvement"
           )
-          for key in "${!label_checks[@]}"; do
-            if echo "$body" | grep -q "\- \[x\] $key"; then
-              labels_to_add+=("${label_checks[$key]}")
+          for label in "${!label_checks[@]}"; do
+            keys="${label_checks[$label]}"
+            label_should_be_added=false
+            for key in $keys; do
+              if echo "$body" | grep -q "\- \[x\] $key"; then
+                label_should_be_added=true
+                break
+              fi
+            done
+            if $label_should_be_added; then
+              labels_to_add+=("$label")
             else
-              labels_to_remove+=("${label_checks[$key]}")
+              labels_to_remove+=("$label")
             fi
           done
           echo "LABELS_TO_ADD=$(IFS=,; echo "${labels_to_add[*]}")" >> $GITHUB_ENV
