@@ -15,22 +15,15 @@ jobs:
           labels_to_add=()
           labels_to_remove=()
           declare -A label_checks=(
-            ["enhancement"]="New feature"
-            ["bug"]="Bug fix Hotfix Security patch"
-            ["documentation"]="Documentation update"
-            ["refactor"]="Refactoring"
-            ["UI/UX"]="UI/UX improvement"
+            ["New feature"]="enhancement"
+            ["Bug fix|Hotfix|Security patch"]="bug"
+            ["Documentation update"]="documentation"
+            ["Refactoring"]="refactor"
+            ["UI/UX improvement"]="UI/UX"
           )
-          for label in "${!label_checks[@]}"; do
-            keys="${label_checks[$label]}"
-            label_should_be_added=false
-            for key in $keys; do
-              if echo "$body" | grep -q "\- \[x\] $key"; then
-                label_should_be_added=true
-                break
-              fi
-            done
-            if $label_should_be_added; then
+          for pattern in "${!label_checks[@]}"; do
+            label="${label_checks[$pattern]}"
+            if echo "$body" | grep -Eq "\- \[x\] ($pattern)"; then
               labels_to_add+=("$label")
             else
               labels_to_remove+=("$label")
